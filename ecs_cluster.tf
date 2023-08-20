@@ -1,127 +1,94 @@
-# module "ecs" {
-#   source = "terraform-aws-modules/ecs/aws"
+module "ecs" {
+  source = "terraform-aws-modules/ecs/aws"
 
-#   cluster_name = "ecs-integrated"
+  cluster_name = local.ecs_cluster_name
 
-#   cluster_configuration = {
-#     execute_command_configuration = {
-#       logging = "OVERRIDE"
-#       log_configuration = {
-#         cloud_watch_log_group_name = "/aws/ecs/aws-ec2"
-#       }
-#     }
-#   }
+  cluster_configuration = {
+    execute_command_configuration = {
+      logging = "OVERRIDE"
+      log_configuration = {
+        cloud_watch_log_group_name = local.ecs_cluster_cloud_watch_log_group_name
+      }
+    }
+  }
 
-#   fargate_capacity_providers = {
-#     FARGATE = {
-#       default_capacity_provider_strategy = {
-#         weight = 50
-#       }
-#     }
-#     FARGATE_SPOT = {
-#       default_capacity_provider_strategy = {
-#         weight = 50
-#       }
-#     }
-#   }
+  services = {
+    container_services = {
+      cpu    = local.ecs_cluster_cpu_capacity
+      memory = local.ecs_cluster_memory_capacity
 
-#   services = {
-#     ecsdemo-frontend = {
-#       cpu    = 1024
-#       memory = 4096
+      container_definitions = {
 
-#       # Container definition(s)
-#       container_definitions = {
+        ecs_genai_container = {
+          cpu       = 256
+          memory    = 512
+          essential = true
+          image     = "public.ecr.aws/aws-containers/ecsdemo-frontend:776fd50"
+          port_mappings = [
+            {
+              name          = "ecs-service-port"
+              containerPort = 8080
+              hostPort      = 8080
+              protocol      = "tcp"
+            }
+          ]
 
-#         fluent-bit = {
-#           cpu       = 512
-#           memory    = 1024
-#           essential = true
-#           image     = "906394416424.dkr.ecr.us-west-2.amazonaws.com/aws-for-fluent-bit:stable"
-#           firelens_configuration = {
-#             type = "fluentbit"
-#           }
-#           memory_reservation = 50
-#         }
+          enable_cloudwatch_logging = true
+          log_configuration = {
+            logDriver = "awslogs"
+            options = {
+              awslogs-group         = local.ecs_cluster_cloud_watch_log_group_name
+              awslogs-region        = local.aws_region
+              awslogs-stream-prefix = "ecs"
+            }
+          }
+        }
+      }
 
-#         ecs-sample = {
-#           cpu       = 512
-#           memory    = 1024
-#           essential = true
-#           image     = "public.ecr.aws/aws-containers/ecsdemo-frontend:776fd50"
-#           port_mappings = [
-#             {
-#               name          = "ecs-sample"
-#               containerPort = 80
-#               protocol      = "tcp"
-#             }
-#           ]
+      service_connect_configuration = {
+        namespace = "ecs-genai-services"
+        service = {
+          client_alias = {
+            port     = 8080
+            dns_name = "ecs-genai-service"
+          }
+          port_name      = "ecs-service-port"
+          discovery_name = "ecs-genai-service"
+        }
+      }
 
-#           # Example image used requires access to write to root filesystem
-#           readonly_root_filesystem = false
+    #   load_balancer = {
+    #     service = {
+    #       target_group_arn = "arn:aws:elasticloadbalancing:eu-west-1:1234567890:targetgroup/bluegreentarget1/209a844cd01825a4"
+    #       container_name   = "ecs_genai_container"
+    #       container_port   = 8080
+    #     }
+    #   }
 
-#           dependencies = [{
-#             containerName = "fluent-bit"
-#             condition     = "START"
-#           }]
+      subnet_ids = data.aws_subnets.private.ids
+      security_group_rules = {
+        alb_ingress_3000 = {
+          type        = "ingress"
+          from_port   = 8080
+          to_port     = 8080
+          protocol    = "tcp"
+          description = "Service port"
+          cidr_blocks = [local.all_cidr_block]
+          #   source_security_group_id = "sg-12345678"
+        }
+        egress_all = {
+          type        = "egress"
+          from_port   = 0
+          to_port     = 0
+          protocol    = "-1"
+          cidr_blocks = [local.all_cidr_block]
+        }
+      }
+    }
+  }
 
-#           enable_cloudwatch_logging = false
-#           log_configuration = {
-#             logDriver = "awsfirelens"
-#             options = {
-#               Name                    = "firehose"
-#               region                  = "eu-west-1"
-#               delivery_stream         = "my-stream"
-#               log-driver-buffer-limit = "2097152"
-#             }
-#           }
-#           memory_reservation = 100
-#         }
-#       }
-
-#       service_connect_configuration = {
-#         namespace = "example"
-#         service = {
-#           client_alias = {
-#             port     = 80
-#             dns_name = "ecs-sample"
-#           }
-#           port_name      = "ecs-sample"
-#           discovery_name = "ecs-sample"
-#         }
-#       }
-
-#       load_balancer = {
-#         service = {
-#           target_group_arn = "arn:aws:elasticloadbalancing:eu-west-1:1234567890:targetgroup/bluegreentarget1/209a844cd01825a4"
-#           container_name   = "ecs-sample"
-#           container_port   = 80
-#         }
-#       }
-
-#       subnet_ids = data.aws_subnets.private.ids
-#       security_group_rules = {
-#         alb_ingress_3000 = {
-#           type                     = "ingress"
-#           from_port                = 80
-#           to_port                  = 80
-#           protocol                 = "tcp"
-#           description              = "Service port"
-#           source_security_group_id = "sg-12345678"
-#         }
-#         egress_all = {
-#           type        = "egress"
-#           from_port   = 0
-#           to_port     = 0
-#           protocol    = "-1"
-#           cidr_blocks = [local.all_cidr_block]
-#         }
-#       }
-#     }
-#   }
-
-#   tags = {
-#     Environment = local.environment
-#     Project     = local.project
-#   }
-# }
+  tags = {
+    Environment = local.environment
+    Project     = local.project
+  }
+}

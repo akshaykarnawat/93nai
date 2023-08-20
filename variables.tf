@@ -89,17 +89,6 @@ variable "lambda_function_name" {
   default     = "data-processing"
 }
 
-
-###############################################################################
-# ECR
-###############################################################################
-variable "ecr_registries" {
-  type        = list(map(any))
-  description = "Elastic Container Registries"
-  default     = [{}]
-}
-
-
 ###############################################################################
 # RDS
 ###############################################################################
@@ -143,4 +132,34 @@ variable "mssql_port" {
   type        = string
   description = "RDS MS SQL port"
   default     = "1433"
+}
+
+###############################################################################
+# ECR
+###############################################################################
+variable "ecr_registries" {
+  type        = list(map(any))
+  description = "Elastic Container Registries"
+  default     = [{}]
+}
+
+###############################################################################
+# ECS
+###############################################################################
+variable "ecs_cluster_name" {
+  type        = string
+  description = "ECS cluster name"
+  default     = "ecs-cluster"
+}
+
+variable "ecs_cluster_cpu_capacity" {
+  type        = number
+  description = "ECS cluster CPU capacity across all services and tasks"
+  default     = 256
+}
+
+variable "ecs_cluster_memory_capacity" {
+  type        = number
+  description = "ECS cluster memory capacity across all services and tasks"
+  default     = 512
 }
